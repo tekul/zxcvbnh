@@ -1,0 +1,21 @@
+Name:               zxcvbn
+Version:            0.1
+Synopsis:           Password strength scoring library
+Description:
+  A password strength calculation library, based on Dan Wheeler's original zxcvbn
+  Javascript code.
+  Mainly a playground for me to try out Haskell for now.
+Author:             Luke Taylor
+Build-Type:         Simple
+Cabal-Version:      >= 1.8
+
+
+Executable zxcvbn
+  Main-is:          Main.hs
+
+
+  Extensions:       DoAndIfThenElse
+  
+  Build-Depends:    base >= 3,
+                    containers >= 0.4
+                    
