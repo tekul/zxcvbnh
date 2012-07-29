@@ -1,13 +1,9 @@
-{-# LANGUAGE DoAndIfThenElse #-}
-
 module Zxcvbn where
 
 import qualified Data.Map as M
-import System.Exit
 import qualified Data.List as L
 import Data.Maybe (mapMaybe)
-
-log2 = logBase 2
+import Entropy
 
 
 type Password = String
@@ -17,28 +13,22 @@ lookup d t@(Token w _ _) = case M.lookup w d of
   Just r -> Just $ DictMatch t "somename" w r
   _      -> Nothing
 
-class Match a where
-  entropy :: a -> Double
-  pattern :: a -> String
-
 
 data Token = Token String Int Int -- Match within a password and its start and end character
                 deriving Show
 
-data DictMatch = DictMatch Token String String Int --  token, dictname, matched word, rank
-                deriving Show
+data Match = DictMatch Token String String Int --  token, dictname, matched word, rank
+           | L33tMatch Token String String Int [(Char,Char)] --  token, dictname, unl33ted, rank, subs
+            deriving Show
 
-data L33tMatch = L33tMatch DictMatch [(Char,Char)] --  token, dictname, unl33ted, rank, subs
+pattern :: Match -> String
+pattern DictMatch {} = "dictionary"
+pattern L33tMatch {} = "dictionary"
 
-rank (DictMatch _ _ _ r) = r
+entropy :: Match -> Double
+entropy (DictMatch (Token s _ _) _ _ rank) = log2 (fromIntegral rank) + extraUpperCaseEntropy s
+entropy (L33tMatch (Token s _ _) _ _ rank subs) = log2 (fromIntegral rank) + extraUpperCaseEntropy s + extraL33tEntropy s subs
 
-instance Match DictMatch where
-  pattern _ = "dictionary"
-  entropy = log2 . fromIntegral . rank
-
-instance Match L33tMatch where
-  pattern (L33tMatch d _) = pattern d
-  entropy (L33tMatch d@(DictMatch t _ _ _) _) = entropy d 
 
 parseDict :: String -> Dict
 parseDict src = foldl (\m (k,v) -> M.insert k v m) M.empty elts
@@ -46,12 +36,12 @@ parseDict src = foldl (\m (k,v) -> M.insert k v m) M.empty elts
         elts  = zip words [1..length words]
 
 
-dictMatches :: Dict -> String -> [DictMatch]
+dictMatches :: Dict -> String -> [Match]
 dictMatches dict password = dictMatch dict [] (tokenize password)
 
-dictMatch :: Dict -> [DictMatch] -> [Token] -> [DictMatch]
-dictMatch d matches [] = matches 
-dictMatch d matches ts = mapMaybe (\t -> Zxcvbn.lookup d t) ts
+dictMatch :: Dict -> [Match] -> [Token] -> [Match]
+dictMatch _ matches [] = matches
+dictMatch d matches ts = mapMaybe (Zxcvbn.lookup d) ts
 
 continuousSubSeqs = filter (not . null) . concatMap L.tails . L.inits
 
@@ -59,4 +49,3 @@ tokenize xs = map (\(s, l) -> Token s (head l) (last l)) $ zip s ind
     where s = continuousSubSeqs xs
           ind = continuousSubSeqs [0..]
 
-  
