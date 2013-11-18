@@ -3,23 +3,22 @@
 module Main where
 
 import System.IO
+import Control.Monad (unless)
 import Zxcvbn
 
-mainLoop :: Dict -> IO ()
-mainLoop dict = do
+mainLoop :: [Matcher] -> IO ()
+mainLoop matchers = do
   putStr "zxcvbn> "
   hFlush stdout
   p <- getLine
-  if null p
-    then return ()
-  else do
-    putStrLn $ "Matches " ++ ( show $ dictMatches dict p)
-    mainLoop dict
+  unless (null p) $ do
+    putStrLn $ "Matches " ++ show (zxcvbn p matchers)
+    mainLoop matchers
 
 
 main :: IO ()
 main = do
-  putStrLn $ "Welcome to zxcvbn. Enter a password to check."
+  putStrLn "Welcome to zxcvbn. Enter a password to check."
   src <- readFile "passwords.txt"
-  mainLoop $ parseDict src
+  mainLoop [dictMatcher "passwords" $ parseDict src]
 
