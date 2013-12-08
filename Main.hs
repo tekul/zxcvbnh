@@ -23,6 +23,7 @@ readWordLists :: IO [Matcher]
 readWordLists = do
     passwords <- readFile "common_passwords_short.txt"
     english   <- readFile "english.txt"
-    return [ dictMatcher "passwords" $ parseDict passwords
-           , dictMatcher "english"   $ parseDict english
-           ]
+    let dictMatchers = [ dictMatcher "passwords" $ parseDict passwords
+                       , dictMatcher "english"   $ parseDict english
+                       ]
+    return $ l33tMatcher dictMatchers : dictMatchers

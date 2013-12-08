@@ -1,5 +1,6 @@
 module Zxcvbn where
 
+import Prelude hiding (words)
 import Control.Applicative
 import Data.Char (toLower)
 import qualified Data.Map as M
@@ -87,7 +88,7 @@ end :: Match -> Int
 end (Match (Token _ _ j) _ _) = j
 
 data MatchType = DictMatch String -- dictname
-               | L33tMatch String String Int [(Char,Char)] --  token, dictname, unl33ted, rank, subs
+               | L33tMatch String String [(Char,Char)] --  dictname, unl33ted, subs
                | SequenceMatch String Bool
                | RepeatMatch Char
                | BruteForceMatch
@@ -178,6 +179,60 @@ validRepeat (Token w begin end) = end - begin + 1 > 2 && isRepeat w
     isRepeat (c:cs) = c == head cs && isRepeat cs
 
 -- L33t Matching
+
+l33tMatcher :: [Matcher] -> Matcher
+l33tMatcher matchers password
+    | null singleSubs = [] -- No l33t substitutions found
+    | otherwise = matches
+    -- Perform substitutions into password to get list of (possibly only
+    -- one) unl33ted words. Look each of them up in the list of matchers
+    -- and filter out any match tokens which don't actually contain
+    -- subsitutions
+  where
+    (unl33ted, allSubs, multiSubs) = L.foldl' unl33t ([],[],[]) password
+    singleSubs = L.nub allSubs
+
+    wordsToLookup = substitute [reverse unl33ted] multiSubs
+
+    matches = do
+             word    <- wordsToLookup
+             matcher <- matchers
+             Match (Token w i j) e matchType <- matcher word
+             let l33tToken = take (j-i+1) $ drop i password
+             if map toLower l33tToken == w
+               then [] -- No l33t chars in token since it is the same as the dictionary match
+               else let isUsed (c,c') = case L.elemIndex c l33tToken of
+                                          Nothing -> False
+                                          Just k -> w !! k == c'
+                        usedSubs = filter isUsed singleSubs
+                        dictName = case matchType of
+                                     DictMatch name -> name
+                                     _              -> "unknown" -- TODO: Sort this type stuff out somehow
+
+                    in return $ Match (Token l33tToken i j) (e + extraL33tEntropy l33tToken usedSubs) (L33tMatch dictName w usedSubs)
+
+
+
+    substitute :: [String] -> [(Char, String)] -> [String]
+    substitute words []   = words
+    substitute words subs = case subs of
+                              [s]  -> words >>= \w -> doMultiSub w s
+                              s:ss -> substitute (words >>= \w -> doMultiSub w s) ss
+
+    doMultiSub word (c, ss) = map (replace word c) ss
+
+    unl33t :: (String, [(Char,Char)], [(Char,String)]) -> Char -> (String, [(Char,Char)], [(Char,String)])
+    unl33t (ul, ss, ms) c = case M.lookup c l33tSubs of
+                              Nothing -> (c:ul, ss, ms)
+                              Just [c'] -> (c':ul, (c,c'):ss, ms)
+                              Just cs -> (c:ul, (map (\sub -> (c, sub)) cs) ++ ss, (c, cs): ms)
+
+
+replace :: String -> Char -> Char -> String
+replace word c c' = let r x
+                           | x == c    = c'
+                           | otherwise = c
+                      in map r word
 
 l33tTable = M.fromList
   [
