@@ -1,6 +1,7 @@
 module Zxcvbn where
 
 import Control.Applicative
+import Data.Char (toLower)
 import qualified Data.Map as M
 import qualified Data.List as L
 --import qualified Data.List.Zipper as Z
@@ -15,9 +16,9 @@ type Matcher = Password -> [Match]
 
 -- Apply a list of matchers to a password and get back the minimum
 -- entropy and corresponding list of matches
-zxcvbn :: Password -> [Matcher] -> (Double, [Match])
-zxcvbn "" _ = (0.0, [])
-zxcvbn p ms = minEntropyMatchSequence p $ ms >>= \m -> m p
+zxcvbn :: [Matcher] -> Password -> (Double, [Match])
+zxcvbn _ "" = (0.0, [])
+zxcvbn ms p = minEntropyMatchSequence p $ ms >>= \m -> m p
 
 type EntropyMatches = [(Double, Maybe Match)]
 
@@ -128,7 +129,7 @@ dictMatcher name dict password = dictMatch dict (tokenize password)
   where
     dictMatch d ts = mapMaybe (lookup d) ts
     meta = DictMatch name
-    lookup d t@(Token w _ _) = fmap (createMatch t w) $ M.lookup w d
+    lookup d t@(Token w _ _) = fmap (createMatch t w) $ M.lookup (map toLower w) d
     createMatch t w rank = Match t (log2 (fromIntegral rank) + extraUpperCaseEntropy w) meta
 
 -- Sequence Matching

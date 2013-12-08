@@ -18,7 +18,7 @@ Library
                     containers >= 0.4,
                     vector >= 0.10
 
-  --Other-modules:    Entropy
+  -- Other-modules:    Entropy
 
 Executable zxcvbn
   Default-Language:  Haskell2010
@@ -31,7 +31,6 @@ Executable zxcvbn
 Test-suite tests
   Default-Language:  Haskell2010
   Type:            exitcode-stdio-1.0
-  Other-Modules:   ZxcvbnSpec
   Build-depends:   zxcvbn,
                    base >= 4,
                    HUnit >= 1.2 && < 2,

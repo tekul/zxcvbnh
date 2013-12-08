@@ -8,11 +8,42 @@ import Zxcvbn
 import Entropy
 import Token
 
-main = defaultMain tests
+-- Approximate equality for entropy values
 
-tests :: TestTree
-tests = testGroup "Tests" [sequenceTests]
+(@?~=) :: Double -> Double -> Assertion
+(@?~=) actual expected = abs ( actual - expected ) < 1e-5 @? assertion
+  where
+    assertion = "Expected: " ++ show expected ++ "\nActual: " ++ show actual
 
+
+main = do
+    matchers <- readWordLists
+    defaultMain $ tests matchers
+
+readWordLists :: IO [Matcher]
+readWordLists = do
+    passwords <- readFile "common_passwords_short.txt"
+    english   <- readFile "english.txt"
+    return [ dictMatcher "passwords" $ parseDict passwords
+           , dictMatcher "english"   $ parseDict english
+           ]
+
+
+tests :: [Matcher] -> TestTree
+tests matchers = testGroup "Tests" [sequenceTests, zxcvbnTests matchers]
+
+
+zxcvbnTests :: [Matcher] -> TestTree
+zxcvbnTests matchers = testGroup "zxcvbn Tests"
+    [ testCase "Entropy of 'correcthorsebatterystaple' == 45.21" $
+        ze "correcthorsebatterystaple" @?~= 45.211653
+    , testCase "Entropy of 'Amateur' == 9.91" $
+        ze "Amateur" @?~= 9.909893
+    , testCase "Entropy of 'AmAteUr' == 14.91" $
+        ze "AmAteUr" @?~= 14.909893
+    ]
+  where
+    ze = fst . (zxcvbn matchers)
 
 repeatTest = map token . repeatMatches . tokenize
 prop_RepeatMatchReverse w = repeatTest (reverse w) == repeatTest w
