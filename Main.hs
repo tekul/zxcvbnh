@@ -1,5 +1,3 @@
-{-# LANGUAGE DoAndIfThenElse #-}
-
 module Main where
 
 import System.IO
@@ -17,13 +15,20 @@ mainLoop matchers = do
 
 
 main :: IO ()
-main = putStrLn "Welcome to zxcvbn. Enter a password to check." >> readWordLists >>= mainLoop
+main = putStrLn "Welcome to zxcvbn. Enter a password to check." >> defaultMatchers >>= mainLoop
+
+defaultMatchers :: IO [Matcher]
+defaultMatchers = do
+    dictMatchers <- readWordLists
+    return $ (l33tMatcher dictMatchers) : theSequenceMatcher : dictMatchers
+
+
+theSequenceMatcher = sequenceMatcher [lowerCaseAlphabetic, upperCaseAlhabetic, digits]
 
 readWordLists :: IO [Matcher]
 readWordLists = do
     passwords <- readFile "common_passwords_short.txt"
     english   <- readFile "english.txt"
-    let dictMatchers = [ dictMatcher "passwords" $ parseDict passwords
-                       , dictMatcher "english"   $ parseDict english
-                       ]
-    return $ l33tMatcher dictMatchers : dictMatchers
+    return [ dictMatcher "passwords" $ parseDict passwords
+           , dictMatcher "english"   $ parseDict english
+           ]

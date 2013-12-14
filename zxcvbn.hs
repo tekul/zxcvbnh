@@ -1,12 +1,10 @@
 module Zxcvbn where
 
 import Prelude hiding (words)
-import Control.Applicative
-import Data.Char (toLower)
+import Data.Char (toLower, isAlpha, isDigit)
 import qualified Data.Map as M
 import qualified Data.List as L
---import qualified Data.List.Zipper as Z
-import Data.Maybe (mapMaybe, fromMaybe, fromJust)
+import Data.Maybe (mapMaybe, fromJust)
 import Entropy
 import Token
 
@@ -89,7 +87,7 @@ end (Match (Token _ _ j) _ _) = j
 
 data MatchType = DictMatch String -- dictname
                | L33tMatch String String [(Char,Char)] --  dictname, unl33ted, subs
-               | SequenceMatch String Bool
+               | SequenceMatch
                | RepeatMatch Char
                | BruteForceMatch
                | SpatialMatch Token String
@@ -134,34 +132,54 @@ dictMatcher name dict password = dictMatch dict (tokenize password)
     createMatch t w rank = Match t (log2 (fromIntegral rank) + extraUpperCaseEntropy w) meta
 
 -- Sequence Matching
-data Sequence = Seq String String deriving (Show, Eq)
+lowerCaseAlphabetic, upperCaseAlhabetic, digits :: String
+lowerCaseAlphabetic = "abcdefghijklmnopqrstuvwxyz"
+upperCaseAlhabetic  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+digits              = "01234567890"
 
-lowerCaseAlphabetic = Seq "lower" "abcdefghijklmnopqrstuvwxyz"
-upperCaseAlhabetic  = Seq "upper" "ABCDEFGHIJ§KLMNOPQRSTUVWXYZ"
-digits              = Seq "digits" "01234567890"
-
-sequences = [lowerCaseAlphabetic, upperCaseAlhabetic, digits]
-
---sequenceMatches :: String -> [(String,String)] -> [Match]
--- sequenceMatches c1:c2:cs = candidateSequence c1 c2 sequences
-
---seqMatch :: String -> Zipper Char -> String
---seqMatch c:cs z =
---    | endp z = Nothing
---    | c == cursor z =
+--sequences = [lowerCaseAlphabetic, upperCaseAlhabetic, digits]
 
 
-candidateSequence :: Char -> Char -> [Sequence] -> Maybe (Sequence, Int)
-candidateSequence _  _  []     = Nothing
-candidateSequence c1 c2 (s:ss) = case sequenceMatch s c1 c2 of
-  Nothing        -> candidateSequence c1 c2 ss
-  Just direction -> Just (s, direction)
+sequenceMatcher :: [String] -> Matcher
+sequenceMatcher seqs = sequenceMatches $ M.unions $ map createSequenceMap seqs
 
-sequenceMatch :: Sequence -> Char -> Char -> Maybe Int
-sequenceMatch (Seq _ s) c1 c2 = (-) <$> L.elemIndex c2 s <*> L.elemIndex c1 s >>=
-                          \relativePos -> case abs relativePos of
-                                            1 -> Just relativePos
-                                            _ -> Nothing
+createSequenceMap :: String -> M.Map String Double
+createSequenceMap s = M.fromList $ subSeqsWithEntropy ++ reverseSeqs
+  where
+    -- Use reversed for non-reversed seqs since we look them up backwards
+    subSeqs = map reverse $ filter (not . L.null) $ concatMap L.tails $ L.inits s
+    subSeqsWithEntropy = zip subSeqs (map seqEntropy subSeqs)
+    reverseSeqs = map (\(sq,e) -> (reverse sq, e + 1.0)) subSeqsWithEntropy
+
+    -- last rather than head since string is reversed
+    seqEntropy sq = (baseEntropy (last sq)) + (log2 $ fromIntegral $ length sq)
+    baseEntropy c
+        | c == '1'  = 1.0
+        | c == 'a'  = 1.0
+        | isDigit c = log2 10
+        | isAlpha c = log2 26
+        | otherwise = 1.0 + log2 26
+
+-- * Create a map/trie of all possible subsequences (fwd and reverse) for each sequence
+-- * fold through the password accumulating a match, i,j and the list of matches
+-- * when no match is found, and j-i > 2, create a match instance, set current match to "", i=j and continue
+
+sequenceMatches :: M.Map String Double -> String -> [Match]
+sequenceMatches ss password = maybe matches (\m -> m : matches) $ match stump k l
+  where
+    (stump, k, l, matches) = L.foldl' extendSequence ("", 0, 0, []) password
+    extendSequence ("", i, j, ms) c = ([c], i, j+1, ms)
+    extendSequence (sq, i, j, ms) c = case M.lookup (c:sq) ss of
+                                              -- If lookup fails, we've
+                                              -- gone as far as we can with
+                                              -- the current sequence
+                                              Nothing  -> let newMatches = maybe ms (\m -> m:ms) $ match sq i j
+                                                          in ([c], j, j+1, newMatches)
+                                              -- Otherwise try to extend it
+                                              _        -> (c:sq, i, j+1, ms)
+    match sq i j
+      | j-i > 2   = fmap (\e -> Match (Token (reverse sq) i (j-1)) e SequenceMatch) $ M.lookup sq ss
+      | otherwise = Nothing
 
 -- Repeat Matching
 --
