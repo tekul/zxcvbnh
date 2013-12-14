@@ -183,7 +183,7 @@ validRepeat (Token w begin end) = end - begin + 1 > 2 && isRepeat w
 l33tMatcher :: [Matcher] -> Matcher
 l33tMatcher matchers password
     | null singleSubs = [] -- No l33t substitutions found
-    | otherwise = matches
+    | otherwise = L.nub matches -- TODO: Use more efficent nub
     -- Perform substitutions into password to get list of (possibly only
     -- one) unl33ted words. Look each of them up in the list of matchers
     -- and filter out any match tokens which don't actually contain
@@ -214,10 +214,9 @@ l33tMatcher matchers password
 
 
     substitute :: [String] -> [(Char, String)] -> [String]
-    substitute words []   = words
-    substitute words subs = case subs of
-                              [s]  -> words >>= \w -> doMultiSub w s
-                              s:ss -> substitute (words >>= \w -> doMultiSub w s) ss
+    substitute words []     = words
+    substitute words [sub]  = words >>= \w -> doMultiSub w sub
+    substitute words (s:ss) = substitute (words >>= \w -> doMultiSub w s) ss
 
     doMultiSub word (c, ss) = map (replace word c) ss
 
@@ -228,11 +227,11 @@ l33tMatcher matchers password
                               Just cs -> (c:ul, (map (\sub -> (c, sub)) cs) ++ ss, (c, cs): ms)
 
 
-replace :: String -> Char -> Char -> String
-replace word c c' = let r x
-                           | x == c    = c'
-                           | otherwise = c
-                      in map r word
+    replace :: String -> Char -> Char -> String
+    replace word c c' = let r x
+                              | x == c    = c'
+                              | otherwise = x
+                        in map r word
 
 l33tTable = M.fromList
   [
