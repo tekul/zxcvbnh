@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns, OverloadedStrings #-}
 module Zxcvbn where
 
 import Prelude hiding (words)
@@ -5,11 +6,12 @@ import Data.Char (toLower, isAlpha, isDigit)
 import qualified Data.Map as M
 import qualified Data.List as L
 import Data.Maybe (mapMaybe, fromJust)
+import qualified Data.Text as T
 import Entropy
 import Token
 
 type Password = String
-type Dict = M.Map String  Int
+type Dict = M.Map String Int
 
 type Matcher = Password -> [Match]
 
@@ -76,7 +78,7 @@ minEntropyMatchSequence p matches = (minEntropy, matchSequence)
         entropyWithMatch = e + if i == 0 then 0 else fst $ minUpTo !! (i-1)
 
 
-data Match = Match Token Double MatchType --  token, entropy
+data Match = Match !Token !Double !MatchType --  token, entropy
            deriving (Show, Eq)
 
 start :: Match -> Int
@@ -118,7 +120,7 @@ entropy YearMatch {} = undefined
 entropy DateMatch {} = undefined
 
 parseDict :: String -> Dict
-parseDict src = foldl (\m (k,v) -> M.insert k v m) M.empty elts
+parseDict src = L.foldl' (\m (k,v) -> M.insert k v m) M.empty elts
   where ws = lines src
         elts  = zip ws [1..length ws]
 
@@ -273,5 +275,4 @@ l33tSubs = M.fromList $ zip k v
     l33tFor l c = elem l $ fromJust $ M.lookup c l33tTable
     k = L.nub $ concat $ M.elems l33tTable
     v = map (\c -> filter (l33tFor c) $ M.keys l33tTable) k
-
 

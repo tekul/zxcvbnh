@@ -1,8 +1,12 @@
+{-# LANGUAGE BangPatterns, OverloadedStrings #-}
+
 module Token where
 
 import Data.List as L
+import Data.Text (Text)
+import qualified Data.Text
 
-data Token = Token String Int Int -- Match within a password and its start and end character
+data Token = Token !String !Int !Int -- Match within a password and its start and end character
                 deriving (Show, Eq)
 
 subtoken :: Token -> Token -> Bool

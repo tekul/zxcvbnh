@@ -1,5 +1,8 @@
+{-# LANGUAGE BangPatterns, OverloadedStrings #-}
+
 module Main where
 
+import System.Environment (getArgs)
 import System.IO
 import Control.Monad (unless)
 import Zxcvbn
@@ -13,15 +16,23 @@ mainLoop matchers = do
       putStrLn $ "Matches: " ++ show (zxcvbn matchers p)
       mainLoop matchers
 
+doZxcvbn :: [Matcher] -> [String] -> IO ()
+doZxcvbn ms []     = return ()
+doZxcvbn ms (p:ps) = (putStrLn $ show (zxcvbn ms p)) >> doZxcvbn ms ps
+
 
 main :: IO ()
-main = putStrLn "Welcome to zxcvbn. Enter a password to check." >> defaultMatchers >>= mainLoop
+main = do
+    args <- getArgs
+    ms   <- defaultMatchers
+    case args of
+      [] -> putStrLn "Welcome to zxcvbn. Enter a password to check." >>  mainLoop ms
+      _  -> (readFile $ head args) >>= return . lines >>= doZxcvbn ms
 
 defaultMatchers :: IO [Matcher]
 defaultMatchers = do
     dictMatchers <- readWordLists
     return $ (l33tMatcher dictMatchers) : theSequenceMatcher : dictMatchers
-
 
 theSequenceMatcher = sequenceMatcher [lowerCaseAlphabetic, upperCaseAlhabetic, digits]
 
