@@ -45,3 +45,17 @@ Test-suite tests
   Hs-source-dirs:  tests
   Main-is:         tests.hs
 
+
+Benchmark bench-zxcvbn
+  Main-is:           bench.hs
+  Type:              exitcode-stdio-1.0
+  Build-depends:     zxcvbn
+                   , base
+                   , bytestring
+                   , containers
+                   , criterion
+                   , parallel
+                   , text
+
+  Ghc-Options:     -Wall -O2
+
