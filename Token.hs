@@ -4,9 +4,10 @@ module Token where
 
 import Data.List as L
 import Data.Text (Text)
-import qualified Data.Text
+import qualified Data.Text as T
+import Data.Char (chr, ord)
 
-data Token = Token !String !Int !Int -- Match within a password and its start and end character
+data Token = Token !Text !Int !Int -- Match within a password and its start and end character
                 deriving (Show, Eq)
 
 subtoken :: Token -> Token -> Bool
@@ -22,12 +23,12 @@ instance Ord Token where
     | otherwise        = GT
 
 -- Creates a list of all possible tokens of a string
-tokenize :: String -> [Token]
-tokenize xs = L.sort $ map (\(s, l) -> Token s (head l) (last l)) $ zip ss ind
+tokenize :: Text -> [Token]
+tokenize p = L.sort $ map (\(s, l) -> Token s (ord $ T.head l) (ord $ T.last l)) $ zip ss ind
   where
-    ss  = continuousSubSeqs xs
-    ind = continuousSubSeqs [0..]
-    continuousSubSeqs = filter (not . null) . concatMap L.tails . L.inits
+    ss  = continuousSubSeqs p
+    ind = continuousSubSeqs $ T.pack (map chr [0..100])
+    continuousSubSeqs = filter (not . T.null) . concatMap T.tails . T.inits
 
 
 -- Removes tokens from a list which are subtokens of another token in the list

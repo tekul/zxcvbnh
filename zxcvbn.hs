@@ -2,16 +2,17 @@
 module Zxcvbn where
 
 import Prelude hiding (words)
-import Data.Char (toLower, isAlpha, isDigit)
+import Data.Char (isAlpha, isDigit)
 import qualified Data.Map as M
 import qualified Data.List as L
 import Data.Maybe (mapMaybe, fromJust)
+import Data.Text (Text)
 import qualified Data.Text as T
 import Entropy
 import Token
 
-type Password = String
-type Dict = M.Map String Int
+type Password = Text
+type Dict = M.Map Text Int
 
 type Matcher = Password -> [Match]
 
@@ -26,12 +27,12 @@ type EntropyMatches = [(Double, Maybe Match)]
 -- Finds the sequence of matches for the password which combine
 -- to give the minimum entropy, including any brute-force matches
 -- filling in the gaps
-minEntropyMatchSequence :: String -> [Match] -> (Double, [Match])
+minEntropyMatchSequence :: Password -> [Match] -> (Double, [Match])
 minEntropyMatchSequence p matches = (minEntropy, matchSequence)
   where
     bfc = bruteForceCardinality p
     lgBfc = log2 $ fromIntegral bfc
-    theEnd = length p - 1
+    theEnd = T.length p - 1
     minEntropies = reverse $ L.foldl' minSeq [] [0..theEnd]
     minEntropy = fst $ head minEntropies
     matchSequence = case intersperseBruteForceMatches $ extractMatchSequence minEntropies [] of
@@ -48,7 +49,7 @@ minEntropyMatchSequence p matches = (minEntropy, matchSequence)
 
     makeBruteForceMatch i j = Match (Token substring i j) (log2 . fromIntegral $ bfc ^ (j-i+1)) BruteForceMatch
       where
-        substring = take (j-i+1) $ drop i p
+        substring = T.take (j-i+1) $ T.drop i p
 
     intersperseBruteForceMatches [] = []
     intersperseBruteForceMatches [m]
@@ -119,9 +120,9 @@ entropy DigitsMatch {} = undefined
 entropy YearMatch {} = undefined
 entropy DateMatch {} = undefined
 
-parseDict :: String -> Dict
+parseDict :: Text -> Dict
 parseDict src = L.foldl' (\m (k,v) -> M.insert k v m) M.empty elts
-  where ws = lines src
+  where ws = T.lines src
         elts  = zip ws [1..length ws]
 
 
@@ -130,7 +131,7 @@ dictMatcher name dict password = dictMatch dict (tokenize password)
   where
     dictMatch d ts = mapMaybe (lookup d) ts
     meta = DictMatch name
-    lookup d t@(Token w _ _) = fmap (createMatch t w) $ M.lookup (map toLower w) d
+    lookup d t@(Token w _ _) = fmap (createMatch t w) $ M.lookup (T.toLower w) d
     createMatch t w rank = Match t (log2 (fromIntegral rank) + extraUpperCaseEntropy w) meta
 
 -- Sequence Matching
@@ -166,10 +167,10 @@ createSequenceMap s = M.fromList $ subSeqsWithEntropy ++ reverseSeqs
 -- * fold through the password accumulating a match, i,j and the list of matches
 -- * when no match is found, and j-i > 2, create a match instance, set current match to "", i=j and continue
 
-sequenceMatches :: M.Map String Double -> String -> [Match]
+sequenceMatches :: M.Map String Double -> Text -> [Match]
 sequenceMatches ss password = maybe matches (\m -> m : matches) $ match stump k l
   where
-    (stump, k, l, matches) = L.foldl' extendSequence ("", 0, 0, []) password
+    (stump, k, l, matches) = L.foldl' extendSequence ("", 0, 0, []) (T.unpack password)
     extendSequence ("", i, j, ms) c = ([c], i, j+1, ms)
     extendSequence (sq, i, j, ms) c = case M.lookup (c:sq) ss of
                                               -- If lookup fails, we've
@@ -180,23 +181,24 @@ sequenceMatches ss password = maybe matches (\m -> m : matches) $ match stump k 
                                               -- Otherwise try to extend it
                                               _        -> (c:sq, i, j+1, ms)
     match sq i j
-      | j-i > 2   = fmap (\e -> Match (Token (reverse sq) i (j-1)) e SequenceMatch) $ M.lookup sq ss
+      | j-i > 2   = fmap (\e -> Match (Token (T.pack $ reverse sq) i (j-1)) e SequenceMatch) $ M.lookup sq ss
       | otherwise = Nothing
 
 -- Repeat Matching
 --
 
 repeatMatches :: [Token] -> [Token]
-
 repeatMatches [] = []
 repeatMatches ts = removeSubTokens $ filter validRepeat ts
 
 validRepeat :: Token -> Bool
 validRepeat (Token w begin end) = end - begin + 1 > 2 && isRepeat w
   where
-    isRepeat []   = True
-    isRepeat (_:[]) = True
-    isRepeat (c:cs) = c == head cs && isRepeat cs
+    isRepeat s
+      | T.null        s = True
+      | T.length s == 1 = True
+      | otherwise       = let cs = T.tail s
+                          in  T.head s == T.head cs && isRepeat cs
 
 -- L33t Matching
 
@@ -209,7 +211,7 @@ l33tMatcher matchers password
     -- and filter out any match tokens which don't actually contain
     -- subsitutions
   where
-    (unl33ted, allSubs, multiSubs) = L.foldl' unl33t ([],[],[]) password
+    (unl33ted, allSubs, multiSubs) = L.foldl' unl33t ([],[],[]) (T.unpack password)
     singleSubs = L.nub allSubs
 
     wordsToLookup = substitute [reverse unl33ted] multiSubs
@@ -217,13 +219,14 @@ l33tMatcher matchers password
     matches = do
              word    <- wordsToLookup
              matcher <- matchers
-             Match (Token w i j) e matchType <- matcher word
-             let l33tToken = take (j-i+1) $ drop i password
-             if map toLower l33tToken == w
+             Match (Token t i j) e matchType <- matcher (T.pack word)
+             let l33tToken = T.take (j-i+1) $ T.drop i password
+             let w = T.unpack t
+             if T.toLower l33tToken == t
                then [] -- No l33t chars in token since it is the same as the dictionary match
-               else let isUsed (c,c') = case L.elemIndex c l33tToken of
+               else let isUsed (c,c') = case T.findIndex (== c) l33tToken of
                                           Nothing -> False
-                                          Just k -> w !! k == c'
+                                          Just k  -> T.index t k == c'
                         usedSubs = filter isUsed singleSubs
                         dictName = case matchType of
                                      DictMatch name -> name

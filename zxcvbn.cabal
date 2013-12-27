@@ -39,6 +39,7 @@ Test-suite tests
                    , tasty >= 0.4.1
                    , tasty-smallcheck >= 0.2
                    , tasty-hunit >= 0.4
+                   , text
                    , smallcheck >= 1.1
                    , vector >= 0.1
   Ghc-options:     -Wall -rtsopts -fno-warn-missing-signatures

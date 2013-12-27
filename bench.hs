@@ -5,6 +5,7 @@ import System.IO
 import Zxcvbn
 import Criterion.Main
 import Control.Parallel.Strategies
+import qualified Data.Text.IO as IOT
 
 main = do
     !ms <- defaultMatchers
@@ -27,8 +28,8 @@ theSequenceMatcher = sequenceMatcher [lowerCaseAlphabetic, upperCaseAlhabetic, d
 
 readWordLists :: IO [Matcher]
 readWordLists = do
-    passwords <- readFile "common_passwords_short.txt"
-    english   <- readFile "english.txt"
+    passwords <- IOT.readFile "common_passwords_short.txt"
+    english   <- IOT.readFile "english.txt"
     return [ dictMatcher "passwords" $ parseDict passwords
            , dictMatcher "english"   $ parseDict english
            ]

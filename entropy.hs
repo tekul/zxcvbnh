@@ -3,7 +3,8 @@ module Entropy where
 
 import Data.Char
 import Data.Int
-import Data.List (foldl')
+import Data.Text (Text)
+import qualified Data.Text as T
 
 type P = Int64
 
@@ -18,36 +19,36 @@ log2 = logBase 2 . realToFrac
 possibilities :: Int -> Int -> P
 possibilities n1 n2 = foldl (\i j -> i + nCk (n1+n2) j ) 0 [0..min n1 n2]
 
-bruteForceCardinality :: String -> Int
+bruteForceCardinality :: Text -> Int
 bruteForceCardinality p = upper + lower + digits + symbols
   where
-    (upper, lower, digits, symbols) = foldl' cardinality (0,0,0,0) p
+    (upper, lower, digits, symbols) = T.foldl' cardinality (0,0,0,0) p
     cardinality (u,l,d,s) c
       | isLower c = (u,26,d,s)
       | isDigit c = (u,l,10,s)
       | isUpper c = (26,l,d,s)
       | otherwise = (u,l,d,33)
 
-extraUpperCaseEntropy :: String -> Double
-extraUpperCaseEntropy s = case countUpperLower s 0 0 of
+extraUpperCaseEntropy :: Text -> Double
+extraUpperCaseEntropy s = case countUpperLower s of
     (0, _) -> 0
-    (1, _) | (isUpper $ head s) || (isUpper $ last s) -> 1
+    (1, _) | (isUpper $ T.head s) || (isUpper $ T.last s) -> 1
     (_, 0) -> 1
     (nU, nL) -> log2 $ possibilities nU nL
 
-countUpperLower :: String -> Int -> Int -> (Int,Int)
-countUpperLower []     nU nL             = (nU,nL)
-countUpperLower (c:cs) nU nL | isUpper c = countUpperLower cs (nU+1) nL
-                             | isLower c = countUpperLower cs nU   (nL+1)
-                             | otherwise = countUpperLower cs nU nL
+countUpperLower s = T.foldl' ul (0,0) s
+  where
+    ul (nU,nL) c
+        | isUpper c = (nU+1, nL)
+        | isLower c = (nU, nL+1)
+        | otherwise = (nU, nL)
 
-extraL33tEntropy :: String -> [(Char,Char)] -> Double
-extraL33tEntropy [] _ = 0
-extraL33tEntropy _ [] = 0
-extraL33tEntropy word subs = case subPossibilities subs word of
-    1 -> 1.0
-    p -> log2 $ fromIntegral p
-
+extraL33tEntropy :: Text -> [(Char,Char)] -> Double
+extraL33tEntropy word subs
+  | T.null word || null subs = 0
+  | otherwise = case subPossibilities subs (T.unpack word) of
+                  1 -> 1.0
+                  p -> log2 $ fromIntegral p
     where
       subPossibilities :: [(Char,Char)] -> String -> P
       subPossibilities [] _     = 0
