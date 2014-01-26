@@ -186,6 +186,12 @@ sequenceMatches ss password = maybe matches (\m -> m : matches) $ match stump k 
 
 -- Repeat Matching
 --
+repeatMatcher :: Matcher
+repeatMatcher = \p -> map createMatch $ repeatMatches $ tokenize p
+  where
+    createMatch t@(Token s i j) = let l = j - i + 1
+                                      e = log2 $ fromIntegral $ l * bruteForceCardinality s
+                                  in Match t e (RepeatMatch (T.head s))
 
 repeatMatches :: [Token] -> [Token]
 repeatMatches [] = []

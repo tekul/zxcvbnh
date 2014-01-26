@@ -22,7 +22,7 @@ import Token
 
 main = do
     matchers <- readWordLists
-    defaultMain $ tests $ sm : (l33tMatcher matchers) : matchers
+    defaultMain $ tests $ sm : repeatMatcher : (l33tMatcher matchers) : matchers
 
 sm = sequenceMatcher [lowerCaseAlphabetic, upperCaseAlhabetic, digits]
 
@@ -55,6 +55,19 @@ zxcvbnTests matchers = testGroup "zxcvbn Tests"
         ze "4b4cu$" @?~= 13.65464
     , testCase "Entropy of '48$0|u+10n' == 16.47" $
         ze "48$0|u+10n" @?~= 16.47002
+    -- Note that a 6 'a' string oddly shows as having lower
+    -- entropy because it occurs early enough in the common
+    -- passwords list to beat a repeat match.
+    , testCase "Entropy of 'aaaaa' == 7.02" $
+        ze "aaaaa" @?~= 7.02236
+    , testCase "Entropy of 'aaaaaa' == 6.48" $
+        ze "aaaaaa" @?~= 6.47573
+    , testCase "Entropy of 'AAAAAAA' == 7.5" $
+        ze "AAAAAAA" @?~= 7.507794
+    , testCase "Entropy of 'aaaaaaaaaaaaaaAAAaaAAaAAaaAAaAaAaA' == 47.10" $
+        ze "aaaaaaaaaaaaaaAAAaaAAaAAaaAAaAaAaA" @?~= 47.09809
+    , testCase "Entropy of '&&&&&&&&&&&&&&&' == 8.95" $
+        ze "&&&&&&&&&&&&&&&" @?~= 8.95128
     ]
   where
     ze = fst . (zxcvbn matchers)
