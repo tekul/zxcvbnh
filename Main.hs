@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Main where
 
@@ -27,20 +27,22 @@ main = do
     args <- getArgs
     ms   <- defaultMatchers
     case args of
-      [] -> putStrLn "Welcome to zxcvbn. Enter a password to check." >>  mainLoop ms
-      _  -> (TIO.readFile $ head args) >>= return . T.lines >>= doZxcvbn ms
+      []    -> putStrLn "Welcome to zxcvbn. Enter a password to check." >>  mainLoop ms
+      (f:_) -> do
+          passwords <- fmap T.lines (TIO.readFile f)
+          doZxcvbn ms passwords
 
 defaultMatchers :: IO [Matcher]
 defaultMatchers = do
     dictMatchers <- readWordLists
     return $ (l33tMatcher dictMatchers) : theSequenceMatcher : dictMatchers
 
-theSequenceMatcher = sequenceMatcher [lowerCaseAlphabetic, upperCaseAlhabetic, digits]
+theSequenceMatcher = sequenceMatcher [lowerCaseAlphabetic, upperCaseAlphabetic, digits]
 
 readWordLists :: IO [Matcher]
 readWordLists = do
     passwords <- TIO.readFile "common_passwords_short.txt"
     english   <- TIO.readFile "english.txt"
-    return [ dictMatcher "passwords" $ parseDict passwords
-           , dictMatcher "english"   $ parseDict english
+    return [ dictMatcher "passwords" $ T.lines passwords
+           , dictMatcher "english"   $ T.lines english
            ]

@@ -1,10 +1,9 @@
 {-# LANGUAGE BangPatterns, OverloadedStrings #-}
 module Main where
 
-import System.IO
+import qualified Data.Text as T
 import Zxcvbn
 import Criterion.Main
-import Control.Parallel.Strategies
 import qualified Data.Text.IO as IOT
 
 main = do
@@ -16,20 +15,18 @@ main = do
           ]
       ]
 
-instance NFData Match
-
 defaultMatchers :: IO [Matcher]
 defaultMatchers = do
     dictMatchers <- readWordLists
-    return $ (l33tMatcher dictMatchers) : theSequenceMatcher : dictMatchers
+    return $ l33tMatcher dictMatchers : theSequenceMatcher : dictMatchers
 
 
-theSequenceMatcher = sequenceMatcher [lowerCaseAlphabetic, upperCaseAlhabetic, digits]
+theSequenceMatcher = sequenceMatcher [lowerCaseAlphabetic, upperCaseAlphabetic, digits]
 
 readWordLists :: IO [Matcher]
 readWordLists = do
     passwords <- IOT.readFile "common_passwords_short.txt"
     english   <- IOT.readFile "english.txt"
-    return [ dictMatcher "passwords" $ parseDict passwords
-           , dictMatcher "english"   $ parseDict english
+    return [ dictMatcher "passwords" $ T.lines passwords
+           , dictMatcher "english"   $ T.lines english
            ]

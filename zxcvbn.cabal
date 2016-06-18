@@ -11,23 +11,24 @@ Cabal-Version:      >= 1.12
 
 Library
   Default-Language:  Haskell2010
-  Exposed-modules:  Zxcvbn, Entropy, Token
-  Other-Extensions: DoAndIfThenElse
+  Exposed-modules:   Zxcvbn
+                   , Entropy
+  Other-modules:     Types
+  Other-Extensions:  DoAndIfThenElse
 
-  Build-Depends:     base >= 4
+  Build-Depends:     base >= 4.8
                    , containers >= 0.4
+                   , deepseq
                    , text >= 0.11
-
-  -- Other-modules:    Entropy
 
 Executable zxcvbn
   Default-Language:  Haskell2010
   Main-is:           Main.hs
   Build-depends:     zxcvbn
                    , base >= 4
+                   , deepseq
                    , text
                    , containers
-                   --, vector >= 0.10
 
 Test-suite tests
   Default-Language:  Haskell2010
@@ -35,19 +36,18 @@ Test-suite tests
   Build-depends:     zxcvbn
                    , base >= 4
                    , HUnit >= 1.2 && < 2
-                   --, hspec >= 1.5
                    , tasty >= 0.4.1
                    , tasty-smallcheck >= 0.2
                    , tasty-hunit >= 0.4
                    , text
                    , smallcheck >= 1.1
-                   , vector >= 0.1
   Ghc-options:     -Wall -rtsopts -fno-warn-missing-signatures
   Hs-source-dirs:  tests
   Main-is:         tests.hs
 
 
 Benchmark bench-zxcvbn
+  Default-Language:  Haskell2010
   Main-is:           bench.hs
   Type:              exitcode-stdio-1.0
   Build-depends:     zxcvbn
@@ -55,8 +55,8 @@ Benchmark bench-zxcvbn
                    , bytestring
                    , containers
                    , criterion
+                   , deepseq
                    , parallel
                    , text
 
   Ghc-Options:     -Wall -O2
-

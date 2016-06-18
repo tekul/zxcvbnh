@@ -10,7 +10,6 @@ import Test.Tasty.HUnit
 
 import Zxcvbn
 import Entropy
-import Token
 
 -- Approximate equality for entropy values
 
@@ -22,16 +21,16 @@ import Token
 
 main = do
     matchers <- readWordLists
-    defaultMain $ tests $ sm : repeatMatcher : (l33tMatcher matchers) : matchers
+    defaultMain $ tests $ sm : repeatMatcher : l33tMatcher matchers : matchers
 
-sm = sequenceMatcher [lowerCaseAlphabetic, upperCaseAlhabetic, digits]
+sm = sequenceMatcher [lowerCaseAlphabetic, upperCaseAlphabetic, digits]
 
 readWordLists :: IO [Matcher]
 readWordLists = do
     passwords <- TIO.readFile "common_passwords_short.txt"
     english   <- TIO.readFile "english.txt"
-    return [ dictMatcher "passwords" $ parseDict passwords
-           , dictMatcher "english"   $ parseDict english
+    return [ dictMatcher "passwords" (T.lines passwords)
+           , dictMatcher "english"   (T.lines english)
            ]
 
 
@@ -70,18 +69,16 @@ zxcvbnTests matchers = testGroup "zxcvbn Tests"
         ze "&&&&&&&&&&&&&&&" @?~= 8.95128
     ]
   where
-    ze = fst . (zxcvbn matchers)
+    ze = fst . zxcvbn matchers
 
-repeatTest = map token . repeatMatches . tokenize
-prop_RepeatMatchReverse w = repeatTest (T.reverse w) == repeatTest w
+prop_RepeatMatchReverse w = repeatMatcher (T.reverse w) == repeatMatcher w
 
 
 -- prop_nCkGEq0 x y = nCk x y >= 0
 --
-case_nCk0 = 0 @=? nCk 0 1
-case_nCk1 = 99884400 @=? nCk 50 7
-case_nCk2 = 2505433700 @=? nCk 50 9
+-- case_nCk0 = 0 @=? nCk 0 1
+-- case_nCk1 = 99884400 @=? nCk 50 7
+-- case_nCk2 = 2505433700 @=? nCk 50 9
 
 prop_UpperCaseEntropyReverse w = extraUpperCaseEntropy (T.reverse w) == extraUpperCaseEntropy w
 prop_L33tEntropyReverse w s = extraL33tEntropy (T.reverse w) s == extraL33tEntropy w s
-

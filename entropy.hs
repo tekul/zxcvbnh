@@ -1,5 +1,11 @@
 {-# LANGUAGE NPlusKPatterns #-}
-module Entropy where
+module Entropy
+  ( bruteForceCardinality
+  , extraUpperCaseEntropy
+  , extraL33tEntropy
+  , log2
+  )
+where
 
 import Data.Char
 import Data.Int
@@ -58,7 +64,7 @@ extraL33tEntropy word subs
 
       countSubbedUnsubbed :: (Char,Char) -> String -> Int -> Int -> (Int,Int)
       countSubbedUnsubbed _ [] nS nU       = (nS,nU)
-      countSubbedUnsubbed sub (c:cs) nS nU  | c == fst sub  = countSubbedUnsubbed sub cs (nS+1) nU
-                                            | c == snd sub  = countSubbedUnsubbed sub cs nS (nU+1)
-                                            | otherwise     = countSubbedUnsubbed sub cs nS nU
-
+      countSubbedUnsubbed sub (c:cs) nS nU
+          | c == fst sub  = countSubbedUnsubbed sub cs (nS+1) nU
+          | c == snd sub  = countSubbedUnsubbed sub cs nS (nU+1)
+          | otherwise     = countSubbedUnsubbed sub cs nS nU

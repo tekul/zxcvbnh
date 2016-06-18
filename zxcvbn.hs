@@ -1,20 +1,28 @@
-{-# LANGUAGE BangPatterns, OverloadedStrings #-}
-module Zxcvbn where
+{-# LANGUAGE OverloadedStrings #-}
+module Zxcvbn
+  ( zxcvbn
+  , dictMatcher
+  , l33tMatcher
+  , repeatMatcher
+  , sequenceMatcher
+  , lowerCaseAlphabetic
+  , upperCaseAlphabetic
+  , digits
+  , module Types
+  )
+where
 
-import Prelude hiding (words)
-import Data.Char (isAlpha, isDigit)
+import           Prelude hiding (words, lookup)
+import           Data.Char (chr, ord, isAlpha, isDigit)
 import qualified Data.Map as M
 import qualified Data.List as L
-import Data.Maybe (mapMaybe, fromJust)
-import Data.Text (Text)
+import           Data.Maybe (mapMaybe, fromJust)
+import           Data.Text (Text)
 import qualified Data.Text as T
+
 import Entropy
-import Token
+import Types
 
-type Password = Text
-type Dict = M.Map Text Int
-
-type Matcher = Password -> [Match]
 
 -- Apply a list of matchers to a password and get back the minimum
 -- entropy and corresponding list of matches
@@ -39,7 +47,7 @@ minEntropyMatchSequence p matches = (minEntropy, matchSequence)
                        []       -> [makeBruteForceMatch 0 theEnd]
                        ms@(m:_) -> if start m == 0
                                    then ms
-                                   else makeBruteForceMatch 0 ((start m)-1) : ms
+                                   else makeBruteForceMatch 0 (start m - 1) : ms
 
     extractMatchSequence :: EntropyMatches -> [Match] -> [Match]
     extractMatchSequence [] ms       = ms
@@ -53,7 +61,7 @@ minEntropyMatchSequence p matches = (minEntropy, matchSequence)
 
     intersperseBruteForceMatches [] = []
     intersperseBruteForceMatches [m]
-        | (end m) == theEnd = [m]
+        | end m == theEnd = [m]
         | otherwise         = m : [makeBruteForceMatch (1 + end m) theEnd]
     intersperseBruteForceMatches (m1:m2:ms)
         | i == j    = m1 : intersperseBruteForceMatches (m2:ms)
@@ -65,7 +73,7 @@ minEntropyMatchSequence p matches = (minEntropy, matchSequence)
     minSeq :: EntropyMatches -> Int -> EntropyMatches
     minSeq acc 0   = [minimiseAtPos 0 acc (lgBfc, Nothing) matches]
     -- TODO: Use cons rather than ++ and access in reverse
-    minSeq acc pos = acc ++ [(minimiseAtPos pos acc ((fst . last) acc + lgBfc, Nothing) matches)]
+    minSeq acc pos = acc ++ [minimiseAtPos pos acc ((fst . last) acc + lgBfc, Nothing) matches]
 
 
     minimiseAtPos :: Int -> EntropyMatches -> (Double, Maybe Match) -> [Match] -> (Double, Maybe Match)
@@ -78,9 +86,26 @@ minEntropyMatchSequence p matches = (minEntropy, matchSequence)
             | otherwise                = bestSoFar
         entropyWithMatch = e + if i == 0 then 0 else fst $ minUpTo !! (i-1)
 
+subtoken :: Token -> Token -> Bool
+subtoken (Token _ i j) (Token _ k l) = i >= k && j <= l
 
-data Match = Match !Token !Double !MatchType --  token, entropy
-           deriving (Show, Eq)
+-- Creates a list of all possible tokens of a string
+tokenize :: Text -> [Token]
+tokenize p = L.sort $ map (\(s, l) -> Token s (ord $ T.head l) (ord $ T.last l)) $ zip ss ind
+  where
+    ss  = continuousSubSeqs p
+    ind = continuousSubSeqs $ T.pack (map chr [0..100])
+    continuousSubSeqs = filter (not . T.null) . concatMap T.tails . T.inits
+
+
+-- Removes tokens from a list which are subtokens of another token in the list
+removeSubTokens :: [Token] -> [Token]
+removeSubTokens [] = []
+removeSubTokens [t] = [t]
+removeSubTokens (t:ts)
+    | t `subtoken` head ts = removeSubTokens ts
+    | head ts `subtoken` t = removeSubTokens $ t:tail ts
+    | otherwise            = t : removeSubTokens ts
 
 start :: Match -> Int
 start (Match (Token _ i _) _ _) = i
@@ -88,60 +113,20 @@ start (Match (Token _ i _) _ _) = i
 end :: Match -> Int
 end (Match (Token _ _ j) _ _) = j
 
-data MatchType = DictMatch String -- dictname
-               | L33tMatch String String [(Char,Char)] --  dictname, unl33ted, subs
-               | SequenceMatch
-               | RepeatMatch Char
-               | BruteForceMatch
-               | SpatialMatch Token String
-               | DigitsMatch Token
-               | YearMatch Token
-               | DateMatch Token Int Bool
-            deriving (Show, Eq)
-
-pattern :: MatchType -> String
-pattern DictMatch {} = "dictionary"
-pattern L33tMatch {} = "dictionary"
-pattern SequenceMatch {} = "sequence"
-pattern RepeatMatch {} = "repeat"
-pattern BruteForceMatch {} = "bruteforce"
-pattern SpatialMatch {} = "spatial"
-pattern DigitsMatch {} = "digits"
-pattern YearMatch {} = "year"
-pattern DateMatch {} = "date"
-
-entropy :: MatchType -> Double
---entropy (L33tMatch (Token s _ _) _ _ rank subs) = log2 (fromIntegral rank) + extraUpperCaseEntropy s + extraL33tEntropy s subs
-entropy SequenceMatch {} = undefined
-entropy RepeatMatch {} = undefined
-entropy BruteForceMatch {} = undefined
-entropy SpatialMatch {} = undefined
-entropy DigitsMatch {} = undefined
-entropy YearMatch {} = undefined
-entropy DateMatch {} = undefined
-
-parseDict :: Text -> Dict
-parseDict src = L.foldl' (\m (k,v) -> M.insert k v m) M.empty elts
-  where ws = T.lines src
-        elts  = zip ws [1..length ws]
-
-
-dictMatcher :: String -> Dict -> Matcher
-dictMatcher name dict password = dictMatch dict (tokenize password)
+dictMatcher :: String -> [Text] -> Matcher
+dictMatcher name words password = mapMaybe match (tokenize password)
   where
-    dictMatch d ts = mapMaybe (lookup d) ts
+    dict = L.foldl' (\m (k,v) -> M.insert k v m) M.empty elts -- M.fromList?
+    elts  = zip words [1..]
     meta = DictMatch name
-    lookup d t@(Token w _ _) = fmap (createMatch t w) $ M.lookup (T.toLower w) d
+    match t@(Token w _ _) = (createMatch t w) <$> M.lookup (T.toLower w) dict
     createMatch t w rank = Match t (log2 (fromIntegral rank) + extraUpperCaseEntropy w) meta
 
--- Sequence Matching
-lowerCaseAlphabetic, upperCaseAlhabetic, digits :: String
+-- Standard sequences
+lowerCaseAlphabetic, upperCaseAlphabetic, digits :: String
 lowerCaseAlphabetic = "abcdefghijklmnopqrstuvwxyz"
-upperCaseAlhabetic  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+upperCaseAlphabetic = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 digits              = "01234567890"
-
---sequences = [lowerCaseAlphabetic, upperCaseAlhabetic, digits]
-
 
 sequenceMatcher :: [String] -> Matcher
 sequenceMatcher seqs = sequenceMatches $ M.unions $ map createSequenceMap seqs
@@ -187,24 +172,24 @@ sequenceMatches ss password = maybe matches (\m -> m : matches) $ match stump k 
 -- Repeat Matching
 --
 repeatMatcher :: Matcher
-repeatMatcher = \p -> map createMatch $ repeatMatches $ tokenize p
+repeatMatcher password = map createMatch $ repeatMatches $ tokenize password
   where
     createMatch t@(Token s i j) = let l = j - i + 1
                                       e = log2 $ fromIntegral $ l * bruteForceCardinality s
                                   in Match t e (RepeatMatch (T.head s))
 
-repeatMatches :: [Token] -> [Token]
-repeatMatches [] = []
-repeatMatches ts = removeSubTokens $ filter validRepeat ts
+    repeatMatches :: [Token] -> [Token]
+    repeatMatches [] = []
+    repeatMatches ts = removeSubTokens $ filter validRepeat ts
 
-validRepeat :: Token -> Bool
-validRepeat (Token w begin end) = end - begin + 1 > 2 && isRepeat w
-  where
-    isRepeat s
-      | T.null        s = True
-      | T.length s == 1 = True
-      | otherwise       = let cs = T.tail s
-                          in  T.head s == T.head cs && isRepeat cs
+    validRepeat :: Token -> Bool
+    validRepeat (Token w begin end) = end - begin + 1 > 2 && isRepeat w -- TODO: Use length of w since it should be the same. We effectively repeat this in isRepeat
+      where
+        isRepeat s
+          | T.null        s = True
+          | T.length s == 1 = True
+          | otherwise       = let cs = T.tail s -- TODO: Use indices here instead of tail
+                              in  T.head s == T.head cs && isRepeat cs
 
 -- L33t Matching
 
@@ -284,4 +269,3 @@ l33tSubs = M.fromList $ zip k v
     l33tFor l c = elem l $ fromJust $ M.lookup c l33tTable
     k = L.nub $ concat $ M.elems l33tTable
     v = map (\c -> filter (l33tFor c) $ M.keys l33tTable) k
-
