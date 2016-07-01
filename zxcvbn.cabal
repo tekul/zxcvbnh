@@ -13,6 +13,7 @@ Library
   Default-Language:  Haskell2010
   Exposed-modules:   Zxcvbn
                    , Entropy
+                   , Adjacency
   Other-modules:     Types
   Other-Extensions:  DoAndIfThenElse
 

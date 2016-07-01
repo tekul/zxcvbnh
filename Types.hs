@@ -22,10 +22,10 @@ data MatchType
     | SequenceMatch
     | RepeatMatch Char
     | BruteForceMatch
-    | SpatialMatch Token String
-    | DigitsMatch Token
-    | YearMatch Token
-    | DateMatch Token Int Bool
+    | SpatialMatch String
+    | DigitsMatch
+    | YearMatch
+    | DateMatch Int Bool
     deriving (Show, Eq, Generic)
 
 instance NFData Token

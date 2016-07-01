@@ -4,6 +4,7 @@ module Entropy
   , extraUpperCaseEntropy
   , extraL33tEntropy
   , log2
+  , nCk
   )
 where
 
