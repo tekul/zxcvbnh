@@ -86,9 +86,6 @@ minEntropyMatchSequence p matches = (minEntropy, matchSequence)
             | otherwise                = bestSoFar
         entropyWithMatch = e + if i == 0 then 0 else fst $ minUpTo !! (i-1)
 
-subtoken :: Token -> Token -> Bool
-subtoken (Token _ i j) (Token _ k l) = i >= k && j <= l
-
 -- Creates a list of all possible tokens of a string
 tokenize :: Text -> [Token]
 tokenize p = L.sort $ map (\(s, l) -> Token s (ord $ T.head l) (ord $ T.last l)) $ zip ss ind
@@ -106,6 +103,8 @@ removeSubTokens (t:ts)
     | t `subtoken` head ts = removeSubTokens ts
     | head ts `subtoken` t = removeSubTokens $ t:tail ts
     | otherwise            = t : removeSubTokens ts
+  where
+    subtoken (Token _ i j) (Token _ k l) = i >= k && j <= l
 
 start :: Match -> Int
 start (Match (Token _ i _) _ _) = i
@@ -116,8 +115,7 @@ end (Match (Token _ _ j) _ _) = j
 dictMatcher :: String -> [Text] -> Matcher
 dictMatcher name words password = mapMaybe match (tokenize password)
   where
-    dict = L.foldl' (\m (k,v) -> M.insert k v m) M.empty elts -- M.fromList?
-    elts  = zip words [1..]
+    dict = M.fromList (zip words [1..]) :: M.Map Text Int
     meta = DictMatch name
     match t@(Token w _ _) = (createMatch t w) <$> M.lookup (T.toLower w) dict
     createMatch t w rank = Match t (log2 (fromIntegral rank) + extraUpperCaseEntropy w) meta
@@ -247,25 +245,24 @@ l33tMatcher matchers password
                               | otherwise = x
                         in map r word
 
-l33tTable = M.fromList
-  [
-    ('a', "4@"),
-    ('b', "8"),
-    ('c', "({[<"),
-    ('e', "3"),
-    ('g', "69"),
-    ('i', "1!|"),
-    ('l', "1|7"),
-    ('o', "0"),
-    ('s', "$5"),
-    ('t', "+7"),
-    ('x', "%"),
-    ('z', "2")
-  ]
-
 l33tSubs :: M.Map Char String
 l33tSubs = M.fromList $ zip k v
   where
     l33tFor l c = elem l $ fromJust $ M.lookup c l33tTable
     k = L.nub $ concat $ M.elems l33tTable
     v = map (\c -> filter (l33tFor c) $ M.keys l33tTable) k
+
+    l33tTable = M.fromList
+        [ ('a', "4@")
+        , ('b', "8")
+        , ('c', "({[<")
+        , ('e', "3")
+        , ('g', "69")
+        , ('i', "1!|")
+        , ('l', "1|7")
+        , ('o', "0")
+        , ('s', "$5")
+        , ('t', "+7")
+        , ('x', "%")
+        , ('z', "2")
+        ]
