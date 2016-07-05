@@ -45,8 +45,9 @@ minEntropyMatchSequence p matches = (minEntropy, matchSequence)
     -- List of the optimal sequence of matches at each index of the password
     -- equivalent of up_to_k and backpointers combined in original code
     -- (the entropy up to index k and the final match ending at k)
-    minEntropies = reverse $ L.foldl' minimiseAtPosition [] [0..theEnd]
-    -- List is reversed, so the entropy of the first element is the total (the entropy up to the end)
+    -- The is reversed, so the entropy of the first element is the total
+    -- minimised entropy to the end of the string
+    minEntropies = L.foldl' minimiseAtPosition [] [0..theEnd]
     minEntropy = fst $ head minEntropies
     matchSequence = case intersperseBruteForceMatches $ extractMatchSequence minEntropies [] of
                        []       -> [makeBruteForceMatch 0 theEnd]
@@ -56,17 +57,22 @@ minEntropyMatchSequence p matches = (minEntropy, matchSequence)
 
     -- Consider each position and all matches which end at that position
     -- Find the match which has minimimum entropy at that point
+    -- The minUpTo list needs to include all the entropy totals because we
+    -- need to look back into previous totals based on the starting
+    -- position of the current match in order to work out the current minimum.
+    -- The complete list of minimised matches is accumulated in reverse,
+    -- with first elt being the minimum match at the end of the password string
+    -- and the total minimum entropy for the string
     minimiseAtPosition :: EntropyMatches -> Int -> EntropyMatches
-    -- TODO: Use cons rather than ++ and access in reverse
-    minimiseAtPosition minUpTo pos = let toBeat = if pos == 0 then lgBfc else fst (last minUpTo) + lgBfc
-                                      in minUpTo ++ [go (toBeat, Nothing) matches]
+    minimiseAtPosition minUpTo pos = let toBeat = if pos == 0 then lgBfc else fst (head minUpTo) + lgBfc
+                                      in go (toBeat, Nothing) matches : minUpTo
       where
         go :: (Double, Maybe Match) -> [Match] -> (Double, Maybe Match)
         go bestSoFar []      = bestSoFar
         go bestSoFar (m@(Match (Token _ i j) e _):ms) =
             -- Entropy with the match is that of the match plus the sequence up to the
             -- start of the match
-            let entropyWithMatch = e + if i == 0 then 0 else fst $ minUpTo !! (i-1)
+            let entropyWithMatch = e + if i == 0 then 0 else fst $ minUpTo !! (pos - i)
                 newBest
                   | j /= pos = bestSoFar
                   | entropyWithMatch < fst bestSoFar = (entropyWithMatch, Just m)
