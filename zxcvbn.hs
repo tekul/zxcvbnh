@@ -38,10 +38,15 @@ type EntropyMatches = [(Double, Maybe Match)]
 minEntropyMatchSequence :: Password -> [Match] -> (Double, [Match])
 minEntropyMatchSequence p matches = (minEntropy, matchSequence)
   where
+    -- The number of guesses for one character based on the password contents
     bfc = bruteForceCardinality p
     lgBfc = log2 $ fromIntegral bfc
     theEnd = T.length p - 1
-    minEntropies = reverse $ L.foldl' minSeq [] [0..theEnd]
+    -- List of the optimal sequence of matches at each index of the password
+    -- equivalent of up_to_k and backpointers combined in original code
+    -- (the entropy up to index k and the final match ending at k)
+    minEntropies = reverse $ L.foldl' minimiseAtPosition [] [0..theEnd]
+    -- List is reversed, so the entropy of the first element is the total (the entropy up to the end)
     minEntropy = fst $ head minEntropies
     matchSequence = case intersperseBruteForceMatches $ extractMatchSequence minEntropies [] of
                        []       -> [makeBruteForceMatch 0 theEnd]
@@ -49,11 +54,30 @@ minEntropyMatchSequence p matches = (minEntropy, matchSequence)
                                    then ms
                                    else makeBruteForceMatch 0 (start m - 1) : ms
 
+    -- Consider each position and all matches which end at that position
+    -- Find the match which has minimimum entropy at that point
+    minimiseAtPosition :: EntropyMatches -> Int -> EntropyMatches
+    -- TODO: Use cons rather than ++ and access in reverse
+    minimiseAtPosition minUpTo pos = let toBeat = if pos == 0 then lgBfc else fst (last minUpTo) + lgBfc
+                                      in minUpTo ++ [go (toBeat, Nothing) matches]
+      where
+        go :: (Double, Maybe Match) -> [Match] -> (Double, Maybe Match)
+        go bestSoFar []      = bestSoFar
+        go bestSoFar (m@(Match (Token _ i j) e _):ms) =
+            -- Entropy with the match is that of the match plus the sequence up to the
+            -- start of the match
+            let entropyWithMatch = e + if i == 0 then 0 else fst $ minUpTo !! (i-1)
+                newBest
+                  | j /= pos = bestSoFar
+                  | entropyWithMatch < fst bestSoFar = (entropyWithMatch, Just m)
+                  | otherwise = bestSoFar
+             in go newBest ms
+
     extractMatchSequence :: EntropyMatches -> [Match] -> [Match]
-    extractMatchSequence [] ms       = ms
-    extractMatchSequence (em:ems) ms = case em of
-                                       (_, Nothing) -> extractMatchSequence ems ms
-                                       (_, Just m@(Match (Token _ i j) _ _))  -> extractMatchSequence (drop (j-i) ems) (m:ms)
+    extractMatchSequence [] ms                 = ms
+    extractMatchSequence ((_, Nothing):ems) ms = extractMatchSequence ems ms
+    extractMatchSequence ((_, Just m@(Match (Token _ i j) _ _)):ems) ms =
+        extractMatchSequence (drop (j-i) ems) (m:ms)
 
     makeBruteForceMatch i j = Match (Token substring i j) (log2 . fromIntegral $ bfc ^ (j-i+1)) BruteForceMatch
       where
@@ -70,21 +94,6 @@ minEntropyMatchSequence p matches = (minEntropy, matchSequence)
         i = 1 + end m1
         j = start m2
 
-    minSeq :: EntropyMatches -> Int -> EntropyMatches
-    minSeq acc 0   = [minimiseAtPos 0 acc (lgBfc, Nothing) matches]
-    -- TODO: Use cons rather than ++ and access in reverse
-    minSeq acc pos = acc ++ [minimiseAtPos pos acc ((fst . last) acc + lgBfc, Nothing) matches]
-
-
-    minimiseAtPos :: Int -> EntropyMatches -> (Double, Maybe Match) -> [Match] -> (Double, Maybe Match)
-    minimiseAtPos _   _       bestSoFar []      = bestSoFar
-    minimiseAtPos pos minUpTo bestSoFar (m@(Match (Token _ i j) e _):ms) = minimiseAtPos pos minUpTo bestEntropyMatchAtPos ms
-      where
-        bestEntropyMatchAtPos
-            | j /= pos                 = bestSoFar -- match doesn't end at current position
-            | entropyWithMatch < fst bestSoFar = (entropyWithMatch, Just m) -- new best
-            | otherwise                = bestSoFar
-        entropyWithMatch = e + if i == 0 then 0 else fst $ minUpTo !! (i-1)
 
 -- Creates a list of all possible tokens of a string
 tokenize :: Text -> [Token]
