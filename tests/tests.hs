@@ -21,7 +21,7 @@ import Entropy
 
 main = do
     matchers <- readWordLists
-    defaultMain $ tests $ sm : repeatMatcher : l33tMatcher matchers : matchers
+    defaultMain $ tests $ sm : repeatMatcher : spatialMatcher qwerty : l33tMatcher matchers : matchers
 
 sm = sequenceMatcher [lowerCaseAlphabetic, upperCaseAlphabetic, digits]
 
@@ -67,6 +67,11 @@ zxcvbnTests matchers = testGroup "zxcvbn Tests"
         ze "aaaaaaaaaaaaaaAAAaaAAaAAaaAAaAaAaA" @?~= 47.09809
     , testCase "Entropy of '&&&&&&&&&&&&&&&' == 8.95" $
         ze "&&&&&&&&&&&&&&&" @?~= 8.95128
+    -- Spatial
+    , testCase "Entropy of 'jhgfds' == 11.077" $
+        ze "jhgfds" @?~= 11.076815
+    , testCase "Entropy of 'qwEdfR43@!' == 34.39" $
+        ze "qwEdfR43@!" @?~= 34.38599
     ]
   where
     ze = fst . zxcvbn matchers

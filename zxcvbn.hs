@@ -9,6 +9,7 @@ module Zxcvbn
   , upperCaseAlphabetic
   , digits
   , module Types
+  , module Adjacency
   )
 where
 
@@ -20,6 +21,7 @@ import           Data.Maybe (mapMaybe, fromJust)
 import           Data.Text (Text)
 import qualified Data.Text as T
 
+import Adjacency
 import Entropy
 import Types
 
